@@ -1,0 +1,26 @@
+#Build results
+bin/
+obj/
+Debug/
+test-results/
+TestResult.xml
+
+#user-specific files
+/packages/
+*/*/*/packages/
+*.userprefs
+*.usertasks
+*.user
+*.suo
+*/*/signers.properties
+*/*/*/signers.properties
+*/*/packages.config
+*/*/*/packages.config
+.vs/
+
+#zip file
+
+*.zip
+
+#Mac
+.DS_Store
