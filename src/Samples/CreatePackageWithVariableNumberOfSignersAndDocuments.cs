@@ -64,10 +64,7 @@ namespace SDK.Examples
 
 	class SignerInfo
 	{
-		public String FirstName
-		{
-			get; set;
-		}
+		public String FirstName { get; set; }
 
 		public String LastName
 		{

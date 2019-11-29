@@ -24,7 +24,7 @@ namespace SDK.Examples
 					              	.EnableExtraction()
 					              	.WithSignature(SignatureBuilder.SignatureFor(email1)
 					            		.WithName("AGENT_SIG_1")
-					               		.EnableExtraction()                                    
+					               		.WithPositionExtracted()                                    
 					               		.WithField(FieldBuilder.SignatureDate()
 					           				.WithName("AGENT_SIG_2")
 					           				.WithPositionExtracted())))

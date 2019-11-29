@@ -13,8 +13,7 @@ namespace SDK.Examples
             new DocumentVisibilityExample(Props.GetInstance()).Run();
         }
 
-        private string email1, email2, email3;
-        private Stream fileStream1, fileStream2, fileStream3;
+        private Stream fileStream3;
 
         public readonly string DOC1_ID = "doc1Id";
         public readonly string DOC2_ID = "doc2Id";

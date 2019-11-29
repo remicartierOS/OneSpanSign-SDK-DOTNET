@@ -28,7 +28,7 @@ namespace SDK.Examples
                     .WithFirstName("John2")
                     .WithLastName("Smith2")
                     .ChallengedWithQuestions(ChallengeBuilder.FirstQuestion(QUESTION1)
-                        .Answer(ANSWER1, Challenge.MaskOptions.None)
+                        .Answer(ANSWER1)
                         .SecondQuestion(QUESTION2)
                         .Answer(ANSWER2, Challenge.MaskOptions.MaskInput)))
                 .WithSigner(SignerBuilder.NewSignerWithEmail(email3)

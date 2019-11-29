@@ -13,7 +13,7 @@ namespace SDK.Examples
 
         private ProxyConfiguration httpProxyConfiguration, httpProxyWithCredentialsConfiguration;
 
-        public EslClient eslClient, eslClientWithHttpProxy, eslClientWithHttpProxyHasCredentials;
+        public EslClient eslClientWithHttpProxy, eslClientWithHttpProxyHasCredentials;
         public PackageId packageId1, packageId2;
         public DocumentPackage package1, package2;
 
