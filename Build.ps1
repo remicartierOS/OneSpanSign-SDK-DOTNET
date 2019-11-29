@@ -24,6 +24,8 @@ function Exec
 
 if(Test-Path .\artifacts) { Remove-Item .\artifacts -Force -Recurse }
 
+if(Test-Path .\.git\index.lock) { Remove-Item .\.git\index.lock -Force }
+
 Write-Host "Restoring nuget packages" -ForegroundColor Yellow -BackgroundColor DarkGreen
 exec { & dotnet restore .\src }
 
