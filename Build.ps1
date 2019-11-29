@@ -26,8 +26,8 @@ if(Test-Path .\artifacts) { Remove-Item .\artifacts -Force -Recurse }
 
 exec { & dotnet restore .\src }
 
-exec { & dotnet build .\src }
+exec { & dotnet build .\src -c Release }
 
 #exec { & dotnet test .\src -c Release }
 
-exec { & dotnet pack .\src\SDK -c Release -o .\artifacts }
+exec { & dotnet pack .\src\SDK --no-build -c Release -o .\artifacts }
