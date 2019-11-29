@@ -24,10 +24,14 @@ function Exec
 
 if(Test-Path .\artifacts) { Remove-Item .\artifacts -Force -Recurse }
 
+Write-Host "Restoring nuget packages" -ForegroundColor Yellow -BackgroundColor DarkGreen
 exec { & dotnet restore .\src }
 
+Write-Host "Building solution" -ForegroundColor Yellow -BackgroundColor DarkGreen
 exec { & dotnet build .\src -c Release }
 
+Write-Host "Running Tests" -ForegroundColor Yellow -BackgroundColor DarkGreen
 #exec { & dotnet test .\src -c Release }
 
+Write-Host "Packaging nuget" -ForegroundColor Yellow -BackgroundColor DarkGreen
 exec { & dotnet pack .\src\SDK --no-build -c Release -o .\artifacts }
