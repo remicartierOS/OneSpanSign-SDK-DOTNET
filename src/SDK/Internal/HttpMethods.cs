@@ -6,6 +6,7 @@ using System.Reflection;
 using Silanis.ESL.SDK;
 using System.Text;
 using System.Security.Authentication;
+using Newtonsoft.Json;
 
 namespace Silanis.ESL.SDK.Internal
 {
@@ -31,6 +32,55 @@ namespace Silanis.ESL.SDK.Internal
         public const string ESL_ACCEPT_TYPE_APPLICATION = ACCEPT_TYPE_APPLICATION + "; " + ESL_API_VERSION_HEADER;
 
         public static ProxyConfiguration proxyConfiguration;
+        public static ApiTokenConfig apiTokenConfig { set; get; }
+        private static ApiToken apiToken = null;
+
+		private static void setupAuthorization(WebRequest request, string apiKey) {
+            if (apiTokenConfig != null) {
+                //Do we have an api token and is it still valid for at least a minute ?
+                TimeSpan timeSpan = DateTime.UtcNow - new DateTime(1970, 1, 1);
+                long milliseconds = (long)timeSpan.TotalMilliseconds;
+                if (apiToken == null || milliseconds > apiToken.ExpiresAt - 60 * 1000) {
+                    //We need to fetch a new access token using the clientAppId/Secret
+                    string jsonPayload = String.Format("{{\"clientId\":\"{0}\",\"secret\":\"{1}\",\"type\":\"{2}\"", apiTokenConfig.ClientAppId, apiTokenConfig.ClientAppSecret, apiTokenConfig.TokenType.ToString());
+                    if (apiTokenConfig.TokenType == ApiTokenType.SENDER) {
+                        jsonPayload += String.Format("\"email\":\"{0}\"", apiTokenConfig.SenderEmail);
+                    }
+                    jsonPayload += "}";
+                    byte[] jsonPayloadBytes = Encoding.Unicode.GetBytes(jsonPayload);
+                    HttpWebRequest apiTokenRequest = (HttpWebRequest)WebRequest.Create(apiTokenConfig.BaseUrl+"/apitoken/clientApp/accessToken");
+                    apiTokenRequest.Method = "POST";
+                    apiTokenRequest.ContentType = ESL_CONTENT_TYPE_APPLICATION_JSON;
+                    apiTokenRequest.ContentLength = jsonPayloadBytes.Length;
+                    apiTokenRequest.Accept = ESL_ACCEPT_TYPE_APPLICATION_JSON;
+                    apiTokenRequest.Timeout = 30000; //30 seconds
+                    SetProxy(apiTokenRequest);
+
+                    using (Stream dataStream = apiTokenRequest.GetRequestStream())
+                    {
+                        dataStream.Write(jsonPayloadBytes, 0, jsonPayloadBytes.Length);
+                    }
+
+                    var httpResponse = (HttpWebResponse)apiTokenRequest.GetResponse();
+
+                    if (httpResponse.StatusCode != HttpStatusCode.OK) {
+                        throw new EslException("Unable to fetch access token for "+apiTokenConfig.ToString()+", response was "+httpResponse.ToString(), null);
+                    }
+
+                    string result;
+                    using (var streamReader = new StreamReader(httpResponse.GetResponseStream()))
+                    {
+                        result = streamReader.ReadToEnd();
+                    }
+                    httpResponse.Close();
+
+                    apiToken = JsonConvert.DeserializeObject<ApiToken>(result);
+                }
+                request.Headers.Add ("Authorization", "Bearer " + apiToken.AccessToken);
+            } else {
+                request.Headers.Add ("Authorization", "Basic " + apiKey);
+            }
+        }
 
         public static byte[] PostHttp(string apiToken, string path, byte[] content)
         {
@@ -48,7 +98,7 @@ namespace Silanis.ESL.SDK.Internal
                 request.ContentType = ESL_CONTENT_TYPE_APPLICATION_JSON;
                 request.ContentLength = content.Length;
                 AddAdditionalHeaders(request, headers);
-                request.Headers.Add("Authorization", "Basic " + apiToken);
+                setupAuthorization(request, apiKey);
                 request.Accept = ESL_ACCEPT_TYPE_APPLICATION_JSON;
                 SetProxy(request);
 
@@ -101,7 +151,7 @@ namespace Silanis.ESL.SDK.Internal
                 request.ContentType = ESL_CONTENT_TYPE_APPLICATION_JSON;
                 request.ContentLength = content.Length;
                 AddAdditionalHeaders(request, headers);
-                AddAuthorizationHeader(request, authHeaderGen);
+                setupAuthorization(request, authHeaderGen.Value);
                 request.Accept = ESL_ACCEPT_TYPE_APPLICATION_JSON;
                 SetProxy(request);
 
@@ -138,12 +188,12 @@ namespace Silanis.ESL.SDK.Internal
             }
         }
 
-        public static byte[] PutHttp(string apiToken, string path, byte[] content)
+        public static byte[] PutHttp(string apiKey, string path, byte[] content)
         {
-            return PutHttp(apiToken, path, content, new Dictionary<string, string>());
+            return PutHttp(apiKey, path, content, new Dictionary<string, string>());
         }
 
-        public static byte[] PutHttp(string apiToken, string path, byte[] content, IDictionary<string, string> headers)
+        public static byte[] PutHttp(string apiKey, string path, byte[] content, IDictionary<string, string> headers)
         {
             try
             {
@@ -154,7 +204,7 @@ namespace Silanis.ESL.SDK.Internal
                 request.ContentType = ESL_CONTENT_TYPE_APPLICATION_JSON;
                 request.ContentLength = content.Length;
                 AddAdditionalHeaders(request, headers);
-                request.Headers.Add("Authorization", "Basic " + apiToken);
+                setupAuthorization(request, apiKey);
                 request.Accept = ESL_ACCEPT_TYPE_APPLICATION_JSON;
                 SetProxy(request);
 
@@ -285,12 +335,12 @@ namespace Silanis.ESL.SDK.Internal
             return true;
         }
 
-        public static DownloadedFile GetHttpJson(string apiToken, string path, string acceptType)
+        public static DownloadedFile GetHttpJson(string apiKey, string path, string acceptType)
         {
-            return GetHttpJson(apiToken, path, acceptType, new Dictionary<string, string>());
+            return GetHttpJson(apiKey, path, acceptType, new Dictionary<string, string>());
         }
 
-        public static DownloadedFile GetHttpJson(string apiToken, string path, string acceptType, IDictionary<string, string> headers)
+        public static DownloadedFile GetHttpJson(string apiKey, string path, string acceptType, IDictionary<string, string> headers)
         {
             try
             {
@@ -299,7 +349,7 @@ namespace Silanis.ESL.SDK.Internal
                 HttpWebRequest request = (HttpWebRequest)WebRequest.Create(path);
                 request.Method = "GET";
                 AddAdditionalHeaders(request, headers);
-                request.Headers.Add("Authorization", "Basic " + apiToken);
+                setupAuthorization(request, apiKey);
                 request.Accept = acceptType;
                 SetProxy(request);
 
@@ -333,12 +383,12 @@ namespace Silanis.ESL.SDK.Internal
             }
         }
 
-        public static DownloadedFile GetHttp(string apiToken, string path)
+        public static DownloadedFile GetHttp(string apiKey, string path)
         {
-            return GetHttp(apiToken, path, new Dictionary<string, string>());
+            return GetHttp(apiKey, path, new Dictionary<string, string>());
         }
 
-        public static DownloadedFile GetHttp(string apiToken, string path, IDictionary<string, string> headers)
+        public static DownloadedFile GetHttp(string apiKey, string path, IDictionary<string, string> headers)
         {
             try
             {
@@ -347,7 +397,7 @@ namespace Silanis.ESL.SDK.Internal
                 HttpWebRequest request = (HttpWebRequest)WebRequest.Create(path);
                 request.Method = "GET";
                 AddAdditionalHeaders(request, headers);
-                request.Headers.Add("Authorization", "Basic " + apiToken);
+                setupAuthorization(request, apiKey);
                 request.Accept = ESL_ACCEPT_TYPE_APPLICATION;
                 SetProxy(request);
 
@@ -404,12 +454,12 @@ namespace Silanis.ESL.SDK.Internal
             return "";
         }
 
-        public static DownloadedFile GetHttpAsOctetStream(string apiToken, string path)
+        public static DownloadedFile GetHttpAsOctetStream(string apiKey, string path)
         {
-            return GetHttpAsOctetStream(apiToken, path, new Dictionary<string, string>());
+            return GetHttpAsOctetStream(apiKey, path, new Dictionary<string, string>());
         }
 
-        public static DownloadedFile GetHttpAsOctetStream(string apiToken, string path, IDictionary<string, string> headers)
+        public static DownloadedFile GetHttpAsOctetStream(string apiKey, string path, IDictionary<string, string> headers)
         {
             try
             {
@@ -418,7 +468,7 @@ namespace Silanis.ESL.SDK.Internal
                 HttpWebRequest request = (HttpWebRequest)WebRequest.Create(path);
                 request.Method = "GET";
                 AddAdditionalHeaders(request, headers);
-                request.Headers.Add("Authorization", "Basic " + apiToken);
+                setupAuthorization(request, apiKey);
                 request.Accept = ESL_ACCEPT_TYPE_APPLICATION_OCTET_STREAM;
                 SetProxy(request);
 
@@ -452,12 +502,12 @@ namespace Silanis.ESL.SDK.Internal
             }
         }
 
-        public static byte[] DeleteHttp(string apiToken, string path)
+        public static byte[] DeleteHttp(string apiKey, string path)
         {
-            return DeleteHttp(apiToken, path, new Dictionary<string, string>());
+            return DeleteHttp(apiKey, path, new Dictionary<string, string>());
         }
 
-        public static byte[] DeleteHttp(string apiToken, string path, IDictionary<string, string> headers)
+        public static byte[] DeleteHttp(string apiKey, string path, IDictionary<string, string> headers)
         {
             try
             {
@@ -466,7 +516,7 @@ namespace Silanis.ESL.SDK.Internal
                 HttpWebRequest request = (HttpWebRequest)WebRequest.Create(path);
                 request.Method = "DELETE";
                 AddAdditionalHeaders(request, headers);
-                request.Headers.Add("Authorization", "Basic " + apiToken);
+                setupAuthorization(request, apiKey);
                 request.Accept = ESL_ACCEPT_TYPE_APPLICATION_JSON;
                 SetProxy(request);
 
@@ -498,7 +548,7 @@ namespace Silanis.ESL.SDK.Internal
             }
         }
 
-        public static byte[] DeleteHttp(string apiToken, string path, byte[] content, IDictionary<string, string> headers)
+        public static byte[] DeleteHttp(string apiKey, string path, byte[] content, IDictionary<string, string> headers)
         {
             try
             {
@@ -509,7 +559,7 @@ namespace Silanis.ESL.SDK.Internal
                 request.ContentType = ESL_CONTENT_TYPE_APPLICATION_JSON;
                 request.ContentLength = content.Length;
                 AddAdditionalHeaders(request, headers);
-                request.Headers.Add("Authorization", "Basic " + apiToken);
+                setupAuthorization(request, apiKey);
                 request.Accept = ESL_ACCEPT_TYPE_APPLICATION_JSON;
                 SetProxy(request);
 
@@ -554,17 +604,12 @@ namespace Silanis.ESL.SDK.Internal
             }
         }
 
-        public static void AddAuthorizationHeader(WebRequest request, AuthHeaderGenerator authHeaderGen)
+        public static string MultipartPostHttp(string apiKey, string path, byte[] content, string boundary, AuthHeaderGenerator authHeaderGen)
         {
-            request.Headers.Add(authHeaderGen.Name, authHeaderGen.Value);
+            return MultipartPostHttp(apiKey, path, content, boundary, authHeaderGen, new Dictionary<string, string>());
         }
 
-        public static string MultipartPostHttp(string apiToken, string path, byte[] content, string boundary, AuthHeaderGenerator authHeaderGen)
-        {
-            return MultipartPostHttp(apiToken, path, content, boundary, authHeaderGen, new Dictionary<string, string>());
-        }
-
-        public static string MultipartPostHttp(string apiToken, string path, byte[] content, string boundary, AuthHeaderGenerator authHeaderGen, IDictionary<string, string> headers)
+        public static string MultipartPostHttp(string apiKey, string path, byte[] content, string boundary, AuthHeaderGenerator authHeaderGen, IDictionary<string, string> headers)
         {
             WebRequest request = WebRequest.Create(path);
             try
@@ -574,8 +619,9 @@ namespace Silanis.ESL.SDK.Internal
                 request.Method = "POST";
                 request.ContentType = string.Format(ESL_CONTENT_TYPE_APPLICATION_MULTIPART, boundary);
                 request.ContentLength = content.Length;
+                request.Timeout = 30000; //30 secs
                 AddAdditionalHeaders(request, headers);
-                AddAuthorizationHeader(request, authHeaderGen);
+                setupAuthorization(request, apiKey);
                 SetProxy(request);
 
                 using (Stream dataStream = request.GetRequestStream())
